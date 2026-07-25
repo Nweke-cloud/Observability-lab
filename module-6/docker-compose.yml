@@ -1,0 +1,113 @@
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data: {}
+  grafana_data: {}
+  tempo_data: {}
+
+services:
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo-m6
+    restart: unless-stopped
+    volumes:
+      - ./tempo/tempo-config.yml:/etc/tempo/config.yml
+      - tempo_data:/tmp/tempo
+    command: -config.file=/etc/tempo/config.yml
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - monitoring
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector-m6
+    restart: unless-stopped
+    volumes:
+      - ./otel-collector/otel-config.yml:/etc/otel-collector/config.yml
+    command: --config=/etc/otel-collector/config.yml
+    ports:
+      - "4319:4317"
+      - "4320:4318"
+      - "8888:8888"
+    networks:
+      - monitoring
+    depends_on:
+      - tempo
+
+  sample-app:
+    image: python:3.11-slim
+    container_name: sample-app-m6
+    restart: unless-stopped
+    volumes:
+      - ./app:/app
+    working_dir: /app
+    command: >
+      sh -c "pip install -r requirements.txt -q &&
+             python app.py"
+    networks:
+      - monitoring
+    depends_on:
+      - otel-collector
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-m6
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/rules:/etc/prometheus/rules
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+      - '--web.enable-remote-write-receiver'
+    ports:
+      - "9096:9090"
+    networks:
+      - monitoring
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter-m6
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana-m6
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=devops123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/node-overview.json
+    ports:
+      - "3004:3000"
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+      - tempo
+

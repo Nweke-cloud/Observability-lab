@@ -1,0 +1,11 @@
+# Environment files with credentials
+**/.env
+**/alertmanager/alertmanager.yml
+
+# Generated files
+**/logs/*.log
+**/__pycache__/
+*.pyc
+
+# Docker volumes
+**/data/

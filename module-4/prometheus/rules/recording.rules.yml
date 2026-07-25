@@ -1,0 +1,27 @@
+groups:
+  - name: node_recording_rules
+    interval: 1m
+    rules:
+
+      - record: job:node_cpu_usage:avg_percent
+        expr: |
+          100 - (
+            avg by(instance) (
+              rate(node_cpu_seconds_total{mode="idle"}[5m])
+            ) * 100
+          )
+
+      - record: job:node_memory_used:percent
+        expr: |
+          (1 - (
+            node_memory_MemAvailable_bytes /
+            node_memory_MemTotal_bytes
+          )) * 100
+
+      - record: job:node_disk_used:percent
+        expr: |
+          (1 - (
+            node_filesystem_avail_bytes{mountpoint="/"} /
+            node_filesystem_size_bytes{mountpoint="/"}
+          )) * 100
+

@@ -1,0 +1,49 @@
+groups:
+  - name: node_alerts
+    rules:
+
+      - alert: HighCPUUsage
+        expr: job:node_cpu_usage:avg_percent > 40
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanize }}% on {{ $labels.instance }}, above 40% threshold for 2 minutes."
+
+      - alert: CriticalCPUUsage
+        expr: job:node_cpu_usage:avg_percent > 50
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanize }}% — immediate action required."
+
+      - alert: HighMemoryUsage
+        expr: job:node_memory_used:percent > 85
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanize }}% on {{ $labels.instance }}."
+
+      - alert: DiskFillingUp
+        expr: job:node_disk_used:percent > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk filling up on {{ $labels.instance }}"
+          description: "Disk at {{ $value | humanize }}% on {{ $labels.instance }}."
+
+      - alert: InstanceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Instance {{ $labels.instance }} is down"
+          description: "{{ $labels.job }} target {{ $labels.instance }} has been unreachable for 1 minute."
+
